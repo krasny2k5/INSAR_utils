@@ -1,5 +1,6 @@
 #!/bin/bash
 
+# v.4.0.1
 # Program to run locally all steps of a ISCE processing using parallel command.
 # Included parameter --num_proc seems to cause problems in our local machines.
 # November 2021 @ Joaquin Escayo jescayo@ucm.es
@@ -8,25 +9,29 @@
 
 # CONFIGURATION
 JOBS=10							# Number of simultaneous jobs in parallel command.
-PARALLELCOMMANDS="--citation"				# Additional commands for Parallel
+
+# Additional commands for Parallel
+PARALLELCOMMANDS="--will-cite"
+#PARALLELCOMMANDS="--sshdelay 1 --retries 10 --filter-hosts --will-cite --controlmaster --timeout 1500% -Jcluster"
 
 # CODE START
 rm run_*_updated run_times &> /dev/null			# Elimino archivos de configuración previos modificados
+rm *.job &> /dev/null
 
 for i in run_*[01]*; do
 STEP=$(echo $i | cut -c5-6); 				# Me quedo con el número de paso en el que me encuentro actualmente.
 rm -rf run$STEP &> /dev/null	 			# Elimino si hay directorios anteriores
 mkdir run$STEP						# Creo el directorio para almacenar los logs.
 rm tmp &> /dev/null					# Elimino si existe un archivo temporal
-#for a in $(cat $i); do
-IFS=$'\n'						# Cambio el separador para poder obtener líneas completas cuando hay espacios.
-for a in $(cat $i); do
-CONFIG=$(echo $a | grep -o '[^/]*$' | sed 's/\ //g')
-echo $a" &> run"$STEP"/"$CONFIG".log" >> tmp
-done
+
+while IFS= read -r line; 				# Update block for assing an output file for each command inside the run files-
+do
+CONFIG=$(echo $line | grep -o '[^/]*$' | sed 's/\ //g')
+echo $line" &> run"$STEP"/"$CONFIG".log" >> tmp
+done < $i
+
 mv tmp $i"_updated"
 echo "Starting step "$STEP" "$i" "$(date "+%d/%m/%y %H:%M")
 echo "Starting step "$STEP" "$i" "$(date "+%d/%m/%y %H:%M") >> run_times
-paralllel $PARALLELCOMMANDS --jobs $JOBS < $i'_updated'
-cat run$STEP"/*.log" > run$STEP".log"
+parallel $PARALLELCOMMANDS --jobs $JOBS < $i"_updated"
 done
